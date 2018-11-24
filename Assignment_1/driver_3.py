@@ -1,9 +1,9 @@
-import collections
-import time
-import resource
-import math
 import argparse
+import collections
 import copy
+import math
+import resource
+import time
 
 
 class StackedFrontier(object):
@@ -215,12 +215,9 @@ def rewind(state):
 
 # Function that Writes to output.txt
 def write_output(result, start_time):
-
     end_state = result['end_state']
-    print('-'*10)
-    print('End state:')
-    end_state.display()
     path = rewind(end_state)
+
     end_time = time.time()
     r = resource.getrusage(resource.RUSAGE_SELF)
 
@@ -232,7 +229,6 @@ max_search_depth: {result['max_search_depth']}
 running_time: {end_time - start_time}
 max_ram_usage: {r.ru_maxrss/1024/1024}
 """
-    print(output_str)
 
     with open("output.txt", "w") as fh:
         fh.write(output_str)
@@ -242,8 +238,6 @@ def process(strategy, init_state, start_time):
     start_state = tuple(map(int, init_state))
     size = int(math.sqrt(len(start_state)))
     hard_state = PuzzleState(start_state, size)
-    print('Initial state:')
-    hard_state.display()
 
     if strategy == "bfs":
         result = bfs_search(hard_state)
