@@ -3,6 +3,7 @@ import time
 import resource
 import math
 import argparse
+import copy
 
 
 class StackedFrontier(object):
@@ -29,6 +30,30 @@ class StackedFrontier(object):
     def __contains__(self, state):
         return state.str_config in self.map
 
+
+class QueueFrontier(object):
+    def __init__(self, state):
+        self.map = {state.str_config: state}
+        self.order = collections.deque([state.str_config])
+
+    def append(self, state):
+        self.map[state.str_config] = state
+        self.order.append(state.str_config)
+
+    def pop(self):
+        state = self.map[self.order.popleft()]
+        del self.map[state.str_config]
+        return state
+
+    def empty(self):
+        return len(self.map) == 0
+
+    def clear(self):
+        self.map = {}
+        self.order = []
+
+    def __contains__(self, state):
+        return state.str_config in self.map
 
 
 class PuzzleState(object):
@@ -93,7 +118,7 @@ class PuzzleState(object):
             new_config[self.blank_pos], new_config[target] = new_config[target], new_config[self.blank_pos]
             return PuzzleState(tuple(new_config), self.n, parent=self, action="Down", cost=self.cost + 1)
 
-    def expand(self, reverse = False):
+    def expand(self, reverse=False):
         # add child nodes in order of UDLR
         if len(self.children) == 0:
             tmp_children = [
@@ -107,18 +132,19 @@ class PuzzleState(object):
                 self.children = list(reversed(self.children))
         return self.children
 
+
 def bfs_search(initial_state):
     """
     BFS search
     """
     goal = tuple(range(len(initial_state.config)))
-    frontier = collections.deque([initial_state])
+    frontier = QueueFrontier(initial_state)
     explored = []
     success = None
     max_search_depth = 0
 
-    while len(frontier) > 0:
-        state = frontier.popleft()
+    while not frontier.empty():
+        state = frontier.pop()
         if state.depth > max_search_depth:
             max_search_depth = state.depth
         explored.append(state.str_config)
@@ -128,8 +154,10 @@ def bfs_search(initial_state):
             success = state
         else:
             for child in state.expand():
+                if child.depth > max_search_depth:
+                    max_search_depth = child.depth
                 if child.str_config not in explored \
-                        and child.str_config not in list(map(lambda x: x.config, frontier)):
+                        and child not in frontier:
                     frontier.append(child)
 
     return dict(end_state=success, n_expanded=len(explored)-1, max_search_depth=max_search_depth)
@@ -147,8 +175,6 @@ def dfs_search(initial_state):
 
     while not frontier.empty():
         state = frontier.pop()
-        if state.depth > max_search_depth:
-            max_search_depth = state.depth
         explored.add(state.str_config)
 
         if test_goal(state, goal):
@@ -158,6 +184,8 @@ def dfs_search(initial_state):
             for child in state.expand(reverse=True):
                 if child.str_config not in explored \
                         and child not in frontier:
+                    if child.depth > max_search_depth:
+                        max_search_depth = child.depth
                     frontier.push(child)
 
     return dict(end_state=success, n_expanded=len(explored)-1, max_search_depth=max_search_depth)
@@ -165,12 +193,6 @@ def dfs_search(initial_state):
 
 def A_star_search(initial_state):
     """A * search"""
-
-
-
-def calculate_total_cost(state):
-    """calculate the total estimated cost of a state"""
-
 
 
 def calculate_manhattan_dist(idx, value, n):
@@ -182,29 +204,38 @@ def test_goal(puzzle_state, goal):
     return puzzle_state.config == goal
 
 
+def rewind(state):
+    tmp_state = copy.copy(state)
+    path = []
+    while tmp_state.parent is not None:
+        path.insert(0, tmp_state.action)
+        tmp_state = copy.copy(tmp_state.parent)
+    return path
+
+
 # Function that Writes to output.txt
 def write_output(result, start_time):
-    def rewind(state, path=None):
-        if not path:
-            path = []
-        if state.parent is not None:
-            path.insert(0, state.action)
-            rewind(state.parent, path)
-        return path
 
     end_state = result['end_state']
     print('-'*10)
     print('End state:')
     end_state.display()
     path = rewind(end_state)
-    print(f"path_to_goal: {path}")
-    print(f"cost_of_path: {end_state.cost}")
-    print(f"nodes_expanded: {result['n_expanded']}")
-    print(f"max_search_depth: {result['max_search_depth']}")
     end_time = time.time()
     r = resource.getrusage(resource.RUSAGE_SELF)
-    print(f"running_time: {end_time - start_time}")
-    print(f"max_ram_usage: {r.ru_maxrss/1024/1024}")
+
+    output_str = f"""path_to_goal: {path}
+cost_of_path: {end_state.cost}
+nodes_expanded: {result['n_expanded']}
+search_depth: {end_state.depth}
+max_search_depth: {result['max_search_depth']}
+running_time: {end_time - start_time}
+max_ram_usage: {r.ru_maxrss/1024/1024}
+"""
+    print(output_str)
+
+    with open("output.txt", "w") as fh:
+        fh.write(output_str)
 
 
 def process(strategy, init_state, start_time):
