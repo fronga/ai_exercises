@@ -5,6 +5,32 @@ import math
 import argparse
 
 
+class StackedFrontier(object):
+    def __init__(self, state):
+        self.map = {state.str_config: state}
+        self.order = [state.str_config]
+
+    def push(self, state):
+        self.map[state.str_config] = state
+        self.order.append(state.str_config)
+
+    def pop(self):
+        state = self.map[self.order.pop()]
+        del self.map[state.str_config]
+        return state
+
+    def empty(self):
+        return len(self.map) == 0
+
+    def clear(self):
+        self.map = {}
+        self.order = []
+
+    def __contains__(self, state):
+        return state.str_config in self.map
+
+
+
 class PuzzleState(object):
     def __init__(self, config, n, parent=None, action="Initial", cost=0):
 
@@ -15,7 +41,7 @@ class PuzzleState(object):
         self.parent = parent
         self.action = action
         self.config = config
-        self.str_config = str(config)
+        self.str_config = str(config)[1:-1]
         self.children = []
         self.depth = parent.depth + 1 if parent else 0
 
@@ -81,7 +107,6 @@ class PuzzleState(object):
                 self.children = list(reversed(self.children))
         return self.children
 
-
 def bfs_search(initial_state):
     """
     BFS search
@@ -96,15 +121,15 @@ def bfs_search(initial_state):
         state = frontier.popleft()
         if state.depth > max_search_depth:
             max_search_depth = state.depth
-        explored.append(state.config)
+        explored.append(state.str_config)
 
         if test_goal(state, goal):
             frontier.clear()
             success = state
         else:
             for child in state.expand():
-                if child.config not in explored \
-                        and child.config not in list(map(lambda x: x.config, frontier)):
+                if child.str_config not in explored \
+                        and child.str_config not in list(map(lambda x: x.config, frontier)):
                     frontier.append(child)
 
     return dict(end_state=success, n_expanded=len(explored)-1, max_search_depth=max_search_depth)
@@ -115,30 +140,25 @@ def dfs_search(initial_state):
     DFS search
     """
     goal = tuple(range(len(initial_state.config)))
-    frontier = [initial_state]
-    frontier_config = [initial_state.str_config]
-    explored = []
+    frontier = StackedFrontier(initial_state)
+    explored = set([])
     success = None
     max_search_depth = 0
 
-    while len(frontier) > 0:
+    while not frontier.empty():
         state = frontier.pop()
-        frontier_config.pop()
         if state.depth > max_search_depth:
             max_search_depth = state.depth
-            if (max_search_depth % 1000) == 0:
-                print(f"{max_search_depth}")
-        explored.append(state.config)
+        explored.add(state.str_config)
 
         if test_goal(state, goal):
             frontier.clear()
             success = state
         else:
             for child in state.expand(reverse=True):
-                if child.config not in explored and \
-                        child.str_config not in frontier_config:
-                    frontier.append(child)
-                    frontier_config.append(child.str_config)
+                if child.str_config not in explored \
+                        and child not in frontier:
+                    frontier.push(child)
 
     return dict(end_state=success, n_expanded=len(explored)-1, max_search_depth=max_search_depth)
 
@@ -173,6 +193,8 @@ def write_output(result, start_time):
         return path
 
     end_state = result['end_state']
+    print('-'*10)
+    print('End state:')
     end_state.display()
     path = rewind(end_state)
     print(f"path_to_goal: {path}")
@@ -189,6 +211,8 @@ def process(strategy, init_state, start_time):
     start_state = tuple(map(int, init_state))
     size = int(math.sqrt(len(start_state)))
     hard_state = PuzzleState(start_state, size)
+    print('Initial state:')
+    hard_state.display()
 
     if strategy == "bfs":
         result = bfs_search(hard_state)
