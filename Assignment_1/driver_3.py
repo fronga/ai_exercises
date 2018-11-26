@@ -154,10 +154,10 @@ def bfs_search(initial_state):
             success = state
         else:
             for child in state.expand():
-                if child.depth > max_search_depth:
-                    max_search_depth = child.depth
                 if child.str_config not in explored \
                         and child not in frontier:
+                    if child.depth > max_search_depth:
+                        max_search_depth = child.depth
                     frontier.append(child)
 
     return dict(end_state=success, n_expanded=len(explored)-1, max_search_depth=max_search_depth)
