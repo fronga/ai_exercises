@@ -6,6 +6,16 @@ import resource
 import time
 
 
+def manhattan_dist(idx, pos, n):
+    """
+    Calculate the manhattan distance of tile idx at position pos
+    """
+
+    row_dist = abs(pos // n - idx // n)
+    col_dist = abs(pos % n - idx % n)
+    return row_dist + col_dist
+
+
 class StackedFrontier(object):
     def __init__(self, state):
         self.map = {state.str_config: state}
@@ -73,6 +83,14 @@ class PuzzleState(object):
         self.blank_pos = self.config.index(0)
         self.blank_row = self.blank_pos // self.n
         self.blank_col = self.blank_pos % self.n
+
+    def manhattan_distance(self):
+        dist = 0
+        for pos, idx in enumerate(self.config):
+            if idx != 0:  # Skip blank
+                dist += manhattan_dist(idx, pos, self.n)
+        return dist
+
 
     def display(self):
         for i in range(self.n):
@@ -193,11 +211,6 @@ def dfs_search(initial_state):
 
 def A_star_search(initial_state):
     """A * search"""
-
-
-def calculate_manhattan_dist(idx, value, n):
-    """calculate the manhattan distance of a tile"""
-
 
 def test_goal(puzzle_state, goal):
     """test the state is the goal state or not"""
