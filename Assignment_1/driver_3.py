@@ -4,7 +4,7 @@ import copy
 import math
 import resource
 import time
-
+import bisect
 
 def manhattan_dist(idx, pos, n):
     """
@@ -14,6 +14,125 @@ def manhattan_dist(idx, pos, n):
     row_dist = abs(pos // n - idx // n)
     col_dist = abs(pos % n - idx % n)
     return row_dist + col_dist
+
+
+class PuzzleState(object):
+    def __init__(self, config, n, parent=None, action="Initial", cost=0):
+
+        # if n * n != len(config) or n < 2:
+        #     raise Exception("the length of config is not correct!")
+        self.n = n
+        self.cost = cost
+        self.parent = parent
+        self.action = action
+        self.config = config
+        self.str_config = str(config)[1:-1]
+        self._children = []
+        self.depth = parent.depth + 1 if parent else 0
+        self._dist = -1
+
+        self.blank_pos = self.config.index(0)
+        self.blank_row = self.blank_pos // self.n
+        self.blank_col = self.blank_pos % self.n
+
+    def manhattan_distance(self):
+        if self._dist < 0:
+            self._dist = 0
+            for pos, idx in enumerate(self.config):
+                if idx != 0:  # Skip blank
+                    self._dist += manhattan_dist(idx, pos, self.n)
+        return self._dist
+
+    def display(self):
+        for i in range(self.n):
+            line = []
+            offset = i * self.n
+            for j in range(self.n):
+                line.append(self.config[offset + j])
+            print(line)
+
+    def move_left(self):
+        if self.blank_col == 0:
+            return None
+        else:
+            target = self.blank_pos - 1
+            new_config = list(self.config)
+            new_config[self.blank_pos], new_config[target] = new_config[target], new_config[self.blank_pos]
+            return PuzzleState(tuple(new_config), self.n, parent=self, action="Left", cost=self.cost + 1)
+
+    def move_right(self):
+        if self.blank_col == self.n - 1:
+            return None
+        else:
+            target = self.blank_pos + 1
+            new_config = list(self.config)
+            new_config[self.blank_pos], new_config[target] = new_config[target], new_config[self.blank_pos]
+            return PuzzleState(tuple(new_config), self.n, parent=self, action="Right", cost=self.cost + 1)
+
+    def move_up(self):
+        if self.blank_row == 0:
+            return None
+        else:
+            target = self.blank_pos - self.n
+            new_config = list(self.config)
+            new_config[self.blank_pos], new_config[target] = new_config[target], new_config[self.blank_pos]
+            return PuzzleState(tuple(new_config), self.n, parent=self, action="Up", cost=self.cost + 1)
+
+    def move_down(self):
+        if self.blank_row == self.n - 1:
+            return None
+        else:
+            target = self.blank_pos + self.n
+            new_config = list(self.config)
+            new_config[self.blank_pos], new_config[target] = new_config[target], new_config[self.blank_pos]
+            return PuzzleState(tuple(new_config), self.n, parent=self, action="Down", cost=self.cost + 1)
+
+    def expand(self, reverse=False):
+        # add child nodes in order of UDLR
+        if len(self._children) == 0:
+            tmp_children = [
+                self.move_up(),
+                self.move_down(),
+                self.move_left(),
+                self.move_right()
+            ]
+            self._children = [x for x in tmp_children if x is not None]
+            if reverse:
+                self._children = list(reversed(self._children))
+        return self._children
+
+
+class SortedFrontier(object):
+    def __init__(self, state: PuzzleState):
+        self.map = {state.str_config: state}
+        self.order = [state.str_config]
+        self.keys = [state.manhattan_distance()]
+
+    def push(self, state: PuzzleState):
+        self.map[state.str_config] = state
+        f_n = state.manhattan_distance() + state.cost
+        idx = bisect.bisect_right(self.keys, f_n)
+        self.keys.insert(idx, f_n)
+        self.order.insert(idx, state.str_config)
+
+    def pop(self):
+        self.keys.pop(0)
+        state = self.map[self.order.pop(0)]
+        del self.map[state.str_config]
+        return state
+
+    def empty(self):
+        return len(self.map) == 0
+
+    def clear(self):
+        self.map = {}
+        self.order = []
+
+    def __contains__(self, state):
+        return state.str_config in self.map
+
+    def __len__(self):
+        return len(self.map)
 
 
 class StackedFrontier(object):
@@ -64,91 +183,6 @@ class QueueFrontier(object):
 
     def __contains__(self, state):
         return state.str_config in self.map
-
-
-class PuzzleState(object):
-    def __init__(self, config, n, parent=None, action="Initial", cost=0):
-
-        # if n * n != len(config) or n < 2:
-        #     raise Exception("the length of config is not correct!")
-        self.n = n
-        self.cost = cost
-        self.parent = parent
-        self.action = action
-        self.config = config
-        self.str_config = str(config)[1:-1]
-        self.children = []
-        self.depth = parent.depth + 1 if parent else 0
-
-        self.blank_pos = self.config.index(0)
-        self.blank_row = self.blank_pos // self.n
-        self.blank_col = self.blank_pos % self.n
-
-    def manhattan_distance(self):
-        dist = 0
-        for pos, idx in enumerate(self.config):
-            if idx != 0:  # Skip blank
-                dist += manhattan_dist(idx, pos, self.n)
-        return dist
-
-
-    def display(self):
-        for i in range(self.n):
-            line = []
-            offset = i * self.n
-            for j in range(self.n):
-                line.append(self.config[offset + j])
-            print(line)
-
-    def move_left(self):
-        if self.blank_col == 0:
-            return None
-        else:
-            target = self.blank_pos - 1
-            new_config = list(self.config)
-            new_config[self.blank_pos], new_config[target] = new_config[target], new_config[self.blank_pos]
-            return PuzzleState(tuple(new_config), self.n, parent=self, action="Left", cost=self.cost + 1)
-
-    def move_right(self):
-        if self.blank_col == self.n - 1:
-            return None
-        else:
-            target = self.blank_pos + 1
-            new_config = list(self.config)
-            new_config[self.blank_pos], new_config[target] = new_config[target], new_config[self.blank_pos]
-            return PuzzleState(tuple(new_config), self.n, parent=self, action="Right", cost=self.cost + 1)
-
-    def move_up(self):
-        if self.blank_row == 0:
-            return None
-        else:
-            target = self.blank_pos - self.n
-            new_config = list(self.config)
-            new_config[self.blank_pos], new_config[target] = new_config[target], new_config[self.blank_pos]
-            return PuzzleState(tuple(new_config), self.n, parent=self, action="Up", cost=self.cost + 1)
-
-    def move_down(self):
-        if self.blank_row == self.n - 1:
-            return None
-        else:
-            target = self.blank_pos + self.n
-            new_config = list(self.config)
-            new_config[self.blank_pos], new_config[target] = new_config[target], new_config[self.blank_pos]
-            return PuzzleState(tuple(new_config), self.n, parent=self, action="Down", cost=self.cost + 1)
-
-    def expand(self, reverse=False):
-        # add child nodes in order of UDLR
-        if len(self.children) == 0:
-            tmp_children = [
-                self.move_up(),
-                self.move_down(),
-                self.move_left(),
-                self.move_right()
-            ]
-            self.children = [x for x in tmp_children if x is not None]
-            if reverse:
-                self.children = list(reversed(self.children))
-        return self.children
 
 
 def bfs_search(initial_state):
@@ -210,14 +244,44 @@ def dfs_search(initial_state):
 
 
 def A_star_search(initial_state):
-    """A * search"""
+    """
+    A * search
+    """
+    goal = tuple(range(len(initial_state.config)))
+    frontier = SortedFrontier(initial_state)
+    explored = set([])
+    success = None
+    max_search_depth = 0
+
+    while not frontier.empty():
+        state = frontier.pop()
+        explored.add(state.str_config)
+
+        if test_goal(state, goal):
+            frontier.clear()
+            success = state
+        else:
+            for child in state.expand():
+                if child.str_config not in explored:
+                    if child.depth > max_search_depth:
+                        max_search_depth = child.depth
+                    frontier.push(child)
+
+    return dict(end_state=success, n_expanded=len(explored)-1, max_search_depth=max_search_depth)
+
+
 
 def test_goal(puzzle_state, goal):
-    """test the state is the goal state or not"""
+    """t
+    est the state is the goal state or not
+    """
     return puzzle_state.config == goal
 
 
 def rewind(state):
+    """
+    Find path back from state to root
+    """
     tmp_state = copy.copy(state)
     path = []
     while tmp_state.parent is not None:
@@ -226,7 +290,6 @@ def rewind(state):
     return path
 
 
-# Function that Writes to output.txt
 def write_output(result, start_time):
     end_state = result['end_state']
     path = rewind(end_state)
@@ -245,6 +308,7 @@ max_ram_usage: {r.ru_maxrss/1024/1024}
 
     with open("output.txt", "w") as fh:
         fh.write(output_str)
+    print(output_str)
 
 
 def process(strategy, init_state, start_time):
