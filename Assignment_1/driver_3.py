@@ -35,13 +35,19 @@ class PuzzleState(object):
         self.blank_row = self.blank_pos // self.n
         self.blank_col = self.blank_pos % self.n
 
-    def manhattan_distance(self):
+    def heuristic(self):
+        """
+        Heuristic based on Manhattan distance
+        """
         if self._dist < 0:
             self._dist = 0
             for pos, idx in enumerate(self.config):
                 if idx != 0:  # Skip blank
                     self._dist += manhattan_dist(idx, pos, self.n)
         return self._dist
+
+    def astar_rank(self):
+        return self.heuristic() + self.cost
 
     def display(self):
         for i in range(self.n):
@@ -106,14 +112,25 @@ class SortedFrontier(object):
     def __init__(self, state: PuzzleState):
         self.map = {state.str_config: state}
         self.order = [state.str_config]
-        self.keys = [state.manhattan_distance()]
+        self.keys = [state.heuristic()]
 
-    def push(self, state: PuzzleState):
+    def _push(self, state: PuzzleState):
         self.map[state.str_config] = state
-        f_n = state.manhattan_distance() + state.cost
-        idx = bisect.bisect_right(self.keys, f_n)
+        f_n = state.astar_rank()
+        idx = bisect.bisect_left(self.keys, f_n)
         self.keys.insert(idx, f_n)
         self.order.insert(idx, state.str_config)
+
+    def push(self, state: PuzzleState):
+        if state.str_config in self.map:
+            # Already there: decrease key
+            tmp_state = self.map[state.str_config]
+            if state.astar_rank() < tmp_state.astar_rank():
+                self.keys.remove(tmp_state.astar_rank())
+                self.order.remove(tmp_state.str_config)
+                self._push(state)
+        else:
+            self._push(state)
 
     def pop(self):
         self.keys.pop(0)
