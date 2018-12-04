@@ -6,6 +6,7 @@ import resource
 import time
 import bisect
 
+
 def manhattan_dist(idx, pos, n):
     """
     Calculate the manhattan distance of tile idx at position pos
@@ -117,7 +118,7 @@ class SortedFrontier(object):
     def _push(self, state: PuzzleState):
         self.map[state.str_config] = state
         f_n = state.astar_rank()
-        idx = bisect.bisect_left(self.keys, f_n)
+        idx = bisect.bisect_right(self.keys, f_n)
         self.keys.insert(idx, f_n)
         self.order.insert(idx, state.str_config)
 
@@ -144,6 +145,11 @@ class SortedFrontier(object):
     def clear(self):
         self.map = {}
         self.order = []
+
+    def display(self):
+        print(f"keys = {self.keys}")
+        print(f"order = {self.order}")
+        print(f"map = {self.map}")
 
     def __contains__(self, state):
         return state.str_config in self.map
@@ -228,7 +234,6 @@ def bfs_search(initial_state):
                     if child.depth > max_search_depth:
                         max_search_depth = child.depth
                     frontier.append(child)
-
     return dict(end_state=success, n_expanded=len(explored)-1, max_search_depth=max_search_depth)
 
 
@@ -260,7 +265,7 @@ def dfs_search(initial_state):
     return dict(end_state=success, n_expanded=len(explored)-1, max_search_depth=max_search_depth)
 
 
-def A_star_search(initial_state):
+def a_star_search(initial_state):
     """
     A * search
     """
@@ -285,7 +290,6 @@ def A_star_search(initial_state):
                     frontier.push(child)
 
     return dict(end_state=success, n_expanded=len(explored)-1, max_search_depth=max_search_depth)
-
 
 
 def test_goal(puzzle_state, goal):
@@ -338,7 +342,7 @@ def process(strategy, init_state, start_time):
     elif strategy == "dfs":
         result = dfs_search(hard_state)
     elif strategy == "ast":
-        result = A_star_search(hard_state)
+        result = a_star_search(hard_state)
     else:
         raise NotImplementedError(f"Unknown search strategy: {sm}")
 
